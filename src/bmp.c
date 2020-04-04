@@ -93,11 +93,11 @@ void BMP_init(u16 double_buffer, VDPPlane plane, u16 palette, u16 priority)
     {
         default:
         case CONST_BG_B:
-            bmp_plan_adr = &bplan_addr;
+            bmp_plan_adr = &bgb_addr;
             break;
 
         case CONST_BG_A:
-            bmp_plan_adr = &aplan_addr;
+            bmp_plan_adr = &bga_addr;
             break;
 
         case CONST_WINDOW:
@@ -172,7 +172,7 @@ void BMP_reset()
         bmp_buffer_1 = MEM_alloc(BMP_PITCH * BMP_HEIGHT * sizeof(u8));
 
     // need 64x64 cells sized plane
-    VDP_setPlanSize(64, 64, TRUE);
+    VDP_setPlaneSize(64, 64, TRUE);
     // clear plane (complete tilemap)
     VDP_clearPlan(bmp_plan, TRUE);
 

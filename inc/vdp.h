@@ -106,12 +106,12 @@
  *  \brief
  *      VDP background A tilemap address in VRAM.
  */
-#define VDP_BG_A                aplan_addr
+#define VDP_BG_A                bga_addr
 /**
  *  \brief
  *      VDP background B tilemap address in VRAM.
  */
-#define VDP_BG_B                bplan_addr
+#define VDP_BG_B                bgb_addr
 /**
  *  \brief
  *      VDP window tilemap address in VRAM.
@@ -400,8 +400,8 @@ typedef struct
 
 // used by define
 extern u16 window_addr;
-extern u16 aplan_addr;
-extern u16 bplan_addr;
+extern u16 bga_addr;
+extern u16 bgb_addr;
 extern u16 hscrl_addr;
 extern u16 slist_addr;
 extern u16 maps_addr;
@@ -422,14 +422,14 @@ extern u16 screenHeight;
  *
  *  Possible values are: 32, 64, 128
  */
-extern u16 planWidth;
+extern u16 planeWidth;
 /**
  *  \brief
  *      Current background plane height (in tile)
  *
  *  Possible values are: 32, 64, 128
  */
-extern u16 planHeight;
+extern u16 planeHeight;
 /**
  *  \brief
  *      Current window width (in tile)
@@ -443,14 +443,14 @@ extern u16 windowWidth;
  *
  *  Possible values are: 5, 6 or 7 (corresponding to plane width 32, 64 and 128)
  */
-extern u16 planWidthSft;
+extern u16 planeWidthSft;
 /**
  *  \brief
  *      Current background plane height bit shift
  *
  *  Possible values are: 5, 6 or 7 (corresponding to plane height 32, 64 and 128)
  */
-extern u16 planHeightSft;
+extern u16 planeHeightSft;
 /**
  *  \brief
  *      Current window width bit shift
@@ -566,13 +566,15 @@ void VDP_setScreenWidth256();
 void VDP_setScreenWidth320();
 
 /**
- *  \deprecated Use the <i>planWidth</i> variable directly.
+ *  \brief
+ *      Return background plane width (in tile).
  */
-u16  VDP_getPlanWidth();
+u16  VDP_getPlaneWidth();
 /**
- *  \deprecated Use the <i>planHeight</i> variable directly.
+ *  \brief
+ *      Return background plane height (in tile).
  */
-u16  VDP_getPlanHeight();
+u16  VDP_getPlaneHeight();
 /**
  *  \brief
  *      Set background plane size (in tile).<br>
@@ -589,7 +591,12 @@ u16  VDP_getPlanHeight();
  *      the plane size.<br>
  *      If you don't know what that means then it's better to keep this value to TRUE :p
  */
-void VDP_setPlanSize(u16 w, u16 h, bool setupVram);
+void VDP_setPlaneSize(u16 w, u16 h, bool setupVram);
+/**
+ *  \deprecated
+ *      Use #VDP_setPlaneSize(..) instead.
+ */
+void VDP_setPlanSize(u16 w, u16 h);
 
 /**
  *  \brief
@@ -708,10 +715,20 @@ void VDP_setHIntCounter(u8 value);
  *  \brief
  *      Get VRAM address (location) of BG A tilemap.
  */
-u16 VDP_getAPlanAddress();
+u16 VDP_getBGAAddress();
 /**
  *  \brief
  *      Get VRAM address (location) of BG B tilemap.
+ */
+u16 VDP_getBGBAddress();
+/**
+ *  \deprecated
+ *      Use #VDP_getBGAAddress(..) instead.
+ */
+u16 VDP_getAPlanAddress();
+/**
+ *  \deprecated
+ *      Use #VDP_getBGBAddress(..) instead.
  */
 u16 VDP_getBPlanAddress();
 /**
@@ -741,10 +758,30 @@ u16 VDP_getHScrollTableAddress();
  *      The address should be at multiple of $2000<br>
  *      <br>
  *      Ex:<br>
- *      VDP_setAPlanAddress(0xC000)<br>
+ *      VDP_setBGAAddress(0xC000)<br>
  *      Will set the BG A to at address 0xC000 in VRAM.
  */
+void VDP_setBGAAddress(u16 value);
+/**
+ *  \brief
+ *      Set VRAM address (location) of BG B tilemap.<br>
+ *      The address should be at multiple of $2000<br>
+ *      <br>
+ *      Ex:<br>
+ *      VDP_setBGBAddress(0xE000)<br>
+ *      Will set the BG B tilemap at address 0xE000 in VRAM.
+ */
+void VDP_setBGBAddress(u16 value);
+/**
+ *  \deprecated
+ *      Use #VDP_setWindowAddress(..) instead.
+ */
 void VDP_setAPlanAddress(u16 value);
+/**
+ *  \deprecated
+ *      Use #VDP_setWindowAddress(..) instead.
+ */
+void VDP_setBPlanAddress(u16 value);
 /**
  *  \brief
  *      Set VRAM address (location) of Window tilemap.<br>
@@ -760,16 +797,6 @@ void VDP_setWindowAddress(u16 value);
  *      Use #VDP_setWindowAddress(..) instead.
  */
 void VDP_setWindowPlanAddress(u16 value);
-/**
- *  \brief
- *      Set VRAM address (location) of BG B tilemap.<br>
- *      The address should be at multiple of $2000<br>
- *      <br>
- *      Ex:<br>
- *      VDP_setBPlanAddress(0xE000)<br>
- *      Will set the BG B tilemap at address 0xE000 in VRAM.
- */
-void VDP_setBPlanAddress(u16 value);
 /**
  *  \brief
  *      Set VRAM address (location) of Sprite list.<br>
