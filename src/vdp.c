@@ -73,10 +73,6 @@ void VDP_init()
     slist_addr = SLIST_DEFAULT;
     hscrl_addr = HSCRL_DEFAULT;
 
-    maps_addr = 0;
-    // update minimum address of all tilemap/table (default is plane B)
-    updateMapsAddress();
-
     // default resolution
     screenWidth = 320;
     screenHeight = 224;
@@ -123,6 +119,44 @@ void VDP_init()
 
     // internal
     curTileInd = TILE_USERINDEX;
+
+    maps_addr = 0;
+    // update minimum address of all tilemap/table (default is plane B)
+    updateMapsAddress();
+}
+
+
+void VDP_resetScreen()
+{
+    u16 i;
+
+    // reset video memory (len = 0 is a special value to define 0x10000)
+    DMA_doVRamFill(0, 0, 0, 1);
+    // wait for DMA completion
+    VDP_waitDMACompletion();
+
+     // system tiles (16 plain tile)
+    i = 16;
+    while(i--) VDP_fillTileData(i | (i << 4), TILE_SYSTEMINDEX + i, 1, TRUE);
+
+    PAL_setPalette(PAL0, palette_grey);
+    PAL_setPalette(PAL1, palette_red);
+    PAL_setPalette(PAL2, palette_green);
+    PAL_setPalette(PAL3, palette_blue);
+
+    VDP_setScrollingMode(HSCROLL_PLANE, VSCROLL_PLANE);
+    VDP_setHorizontalScroll(BG_A, 0);
+    VDP_setHorizontalScroll(BG_B, 0);
+    VDP_setVerticalScroll(BG_A, 0);
+    VDP_setVerticalScroll(BG_B, 0);
+
+    // load default font
+    if (!VDP_loadFont(&font_default, CPU))
+    {
+        KLog("A fatal error occured (not enough memory to reset VDP) !");
+        // fatal error --> die here (the font did not get loaded so maybe not really useful to show this message...)
+        SYS_die("A fatal error occured (not enough memory to reset VDP) !");
+    }
 }
 
 
@@ -355,34 +389,53 @@ void VDP_setPlaneSize(u16 w, u16 h, bool setupVram)
         planeWidth = 128;
         planeWidthSft = 7;
         v |= 0x03;
+
+        // plane height fixed to 32
+        planeHeight = 32;
+        planeHeightSft = 5;
     }
     else if (w & 0x40)
     {
         planeWidth = 64;
         planeWidthSft = 6;
         v |= 0x01;
+
+        // only 64 or 32 accepted for plane height
+        if (h & 0x40)
+        {
+            planeHeight = 64;
+            planeHeightSft = 6;
+            v |= 0x10;
+        }
+        else
+        {
+            planeHeight = 32;
+            planeHeightSft = 5;
+        }
     }
     else
     {
         planeWidth = 32;
         planeWidthSft = 5;
-    }
-    if (h & 0x80)
-    {
-        planeHeight = 128;
-        planeHeightSft = 7;
-        v |= 0x30;
-    }
-    else if (h & 0x40)
-    {
-        planeHeight = 64;
-        planeHeightSft = 6;
-        v |= 0x10;
-    }
-    else
-    {
-        planeHeight = 32;
-        planeHeightSft = 5;
+
+        // plane height can be 128, 64 or 32
+        if (h & 0x80)
+        {
+            planeHeight = 128;
+            planeHeightSft = 7;
+            v |= 0x30;
+        }
+        else if (h & 0x40)
+        {
+            planeHeight = 64;
+            planeHeightSft = 6;
+            v |= 0x10;
+        }
+        else
+        {
+            planeHeight = 32;
+            planeHeightSft = 5;
+        }
     }
 
     regValues[0x10] = v;
@@ -426,6 +479,8 @@ void VDP_setPlaneSize(u16 w, u16 h, bool setupVram)
                 // you need to change Sprite List and HScroll Table address to have a complete window plane if required
                 break;
         }
+
+        updateMapsAddress();
     }
 }
 
@@ -781,39 +836,6 @@ static void computeFrameCPULoad(u16 blank, u16 vcnt)
 }
 
 
-void VDP_resetScreen()
-{
-    u16 i;
-
-    // reset video memory (len = 0 is a special value to define 0x10000)
-    DMA_doVRamFill(0, 0, 0, 1);
-    // wait for DMA completion
-    VDP_waitDMACompletion();
-
-     // system tiles (16 plain tile)
-    i = 16;
-    while(i--) VDP_fillTileData(i | (i << 4), TILE_SYSTEMINDEX + i, 1, TRUE);
-
-    PAL_setPalette(PAL0, palette_grey);
-    PAL_setPalette(PAL1, palette_red);
-    PAL_setPalette(PAL2, palette_green);
-    PAL_setPalette(PAL3, palette_blue);
-
-    VDP_setScrollingMode(HSCROLL_PLANE, VSCROLL_PLANE);
-    VDP_setHorizontalScroll(BG_A, 0);
-    VDP_setHorizontalScroll(BG_B, 0);
-    VDP_setVerticalScroll(BG_A, 0);
-    VDP_setVerticalScroll(BG_B, 0);
-
-    // load default font
-    if (!VDP_loadFont(&font_default, CPU))
-    {
-        KLog("A fatal error occured (not enough memory to reset VDP) !");
-        // fatal error --> die here (the font did not get loaded so maybe not really useful to show this message...)
-        SYS_die("A fatal error occured (not enough memory to reset VDP) !");
-    }
-}
-
 u16 getAdjustedVCounterInternal(u16 blank, u16 vcnt)
 {
     u16 result = vcnt;
@@ -823,12 +845,20 @@ u16 getAdjustedVCounterInternal(u16 blank, u16 vcnt)
     {
         // blank adjustement
         if (blank && ((result >= 0xCA) || (result <= 0x0A))) result = 8;
+        // sometime blank flag is not yet/anymore set on edge area so we double check
+        else if (result >= VDP_getScreenHeight()) result = 8;
         else result += 16;
     }
     else
     {
+//        // blank adjustement
+//        if (blank && (result >= 0xDF)) result = 16;
+//        // sometime blank flag is not yet/anymore set on edge area
+//        else if (result >= 224) result = 16;
+//        else result += 32;
+
         // blank adjustement
-        if (blank && (result >= 0xDF)) result = 16;
+        if (result >= 0xDF) result = 16;
         else result += 32;
     }
 
@@ -893,8 +923,11 @@ static void updateMapsAddress()
     {
         maps_addr = min_addr;
         // reload default font as its VRAM address has changed
-        VDP_loadFont(&font_default, DMA);
+        VDP_loadFont(&font_default, CPU);
         // update user max tile index
         updateUserTileMaxIndex();
+
+        // re-pack memory as VDP_lontFont allocate memory to unpack font
+        MEM_pack();
     }
 }
